@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing } from '../../constants/theme';
 import MetricBlock from './MetricBlock';
@@ -23,6 +23,53 @@ interface WorkoutModeProps {
 export default function WorkoutMode({ workout, onRunComplete }: WorkoutModeProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [distance, setDistance] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Format seconds to MM:SS or HH:MM:SS
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate pace (minutes per mile)
+  const calculatePace = (): string => {
+    if (distance === 0 || elapsedSeconds === 0) return '0:00';
+    const paceInSeconds = elapsedSeconds / distance;
+    const paceMinutes = Math.floor(paceInSeconds / 60);
+    const paceSeconds = Math.floor(paceInSeconds % 60);
+    return `${paceMinutes}:${paceSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Timer effect
+  useEffect(() => {
+    if (isRunning && !isPaused) {
+      intervalRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+        // Simulate distance tracking
+        setDistance(prev => prev + 0.002); // Slightly faster for workout mode
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning, isPaused]);
 
   const defaultWorkout = {
     name: "5 Mile Tempo Run",
@@ -39,6 +86,13 @@ export default function WorkoutMode({ workout, onRunComplete }: WorkoutModeProps
 
   const handleStartWorkout = () => {
     setIsRunning(true);
+    setIsPaused(false);
+    setElapsedSeconds(0);
+    setDistance(0);
+  };
+
+  const handlePauseWorkout = () => {
+    setIsPaused(!isPaused);
   };
 
   const handleNextStep = () => {
@@ -51,11 +105,25 @@ export default function WorkoutMode({ workout, onRunComplete }: WorkoutModeProps
 
   const handleCompleteWorkout = () => {
     setIsRunning(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
     onRunComplete({
       type: 'workout',
       workoutName: activeWorkout.name,
       completed: true,
+      time: formatTime(elapsedSeconds),
+      distance: distance.toFixed(2),
+      pace: calculatePace(),
+      elapsedSeconds,
     });
+    
+    // Reset values
+    setElapsedSeconds(0);
+    setDistance(0);
+    setCurrentStep(0);
   };
 
   if (!isRunning) {
@@ -98,16 +166,27 @@ export default function WorkoutMode({ workout, onRunComplete }: WorkoutModeProps
       )}
 
       <View style={styles.metrics}>
-        <MetricBlock label="Time" value="05:23" size="medium" />
-        <MetricBlock label="Distance" value="0.75" unit="mi" size="medium" />
-        <MetricBlock label="Current Pace" value="7:45" unit="/mi" size="medium" />
+        <MetricBlock label="Time" value={formatTime(elapsedSeconds)} size="medium" />
+        <MetricBlock label="Distance" value={distance.toFixed(2)} unit="mi" size="medium" />
+        <MetricBlock label="Current Pace" value={calculatePace()} unit="/mi" size="medium" />
       </View>
 
-      <TouchableOpacity style={styles.nextButton} onPress={handleNextStep}>
-        <Text style={styles.nextButtonText}>
-          {currentStep === activeWorkout.steps.length - 1 ? 'Complete Workout' : 'Next Step'}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.controls}>
+        <TouchableOpacity 
+          style={[styles.controlButton, styles.pauseButton]} 
+          onPress={handlePauseWorkout}
+        >
+          <Text style={styles.controlButtonText}>
+            {isPaused ? 'Resume' : 'Pause'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.nextButton} onPress={handleNextStep}>
+          <Text style={styles.nextButtonText}>
+            {currentStep === activeWorkout.steps.length - 1 ? 'Complete Workout' : 'Next Step'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -195,10 +274,29 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: 8,
     alignItems: 'center',
+    flex: 1,
   },
   nextButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.base,
     fontWeight: '600',
+  },
+  controls: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  controlButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pauseButton: {
+    backgroundColor: Colors.gray[200],
+  },
+  controlButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '600',
+    color: Colors.gray[900],
   },
 });

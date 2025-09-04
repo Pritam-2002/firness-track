@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing } from '../../constants/theme';
 import MetricBlock from './MetricBlock';
@@ -10,14 +10,59 @@ interface FreeRunModeProps {
 export default function FreeRunMode({ onRunComplete }: FreeRunModeProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [time, setTime] = useState('00:00');
-  const [distance, setDistance] = useState('0.00');
-  const [pace, setPace] = useState('0:00');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [distance, setDistance] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Format seconds to MM:SS or HH:MM:SS
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate pace (minutes per mile)
+  const calculatePace = (): string => {
+    if (distance === 0 || elapsedSeconds === 0) return '0:00';
+    const paceInSeconds = elapsedSeconds / distance;
+    const paceMinutes = Math.floor(paceInSeconds / 60);
+    const paceSeconds = Math.floor(paceInSeconds % 60);
+    return `${paceMinutes}:${paceSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Timer effect
+  useEffect(() => {
+    if (isRunning && !isPaused) {
+      intervalRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+        // Simulate distance tracking - in real app, this would come from GPS
+        setDistance(prev => prev + 0.001); // Very slow increment for demo
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning, isPaused]);
 
   const handleStartRun = () => {
     setIsRunning(true);
     setIsPaused(false);
-    // Start timer logic would go here
+    setElapsedSeconds(0);
+    setDistance(0);
   };
 
   const handlePauseRun = () => {
@@ -27,12 +72,22 @@ export default function FreeRunMode({ onRunComplete }: FreeRunModeProps) {
   const handleEndRun = () => {
     setIsRunning(false);
     setIsPaused(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
     onRunComplete({
       type: 'free',
-      time,
-      distance,
-      pace,
+      time: formatTime(elapsedSeconds),
+      distance: distance.toFixed(2),
+      pace: calculatePace(),
+      elapsedSeconds,
     });
+    
+    // Reset values
+    setElapsedSeconds(0);
+    setDistance(0);
   };
 
   if (!isRunning) {
@@ -58,9 +113,9 @@ export default function FreeRunMode({ onRunComplete }: FreeRunModeProps) {
   return (
     <View style={styles.container}>
       <View style={styles.liveMetrics}>
-        <MetricBlock label="Time" value={time} size="large" />
-        <MetricBlock label="Distance" value={distance} unit="mi" size="large" />
-        <MetricBlock label="Live Pace" value={pace} unit="/mi" size="large" />
+        <MetricBlock label="Time" value={formatTime(elapsedSeconds)} size="large" />
+        <MetricBlock label="Distance" value={distance.toFixed(2)} unit="mi" size="large" />
+        <MetricBlock label="Live Pace" value={calculatePace()} unit="/mi" size="large" />
       </View>
 
       <View style={styles.controls}>

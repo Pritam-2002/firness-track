@@ -8,6 +8,8 @@ interface AppContextType {
   addWorkout: (workout: WorkoutData) => void;
   createWorkoutTemplate: (template: WorkoutTemplate) => void;
   scheduleWorkout: (scheduledWorkout: ScheduledWorkout) => void;
+  cancelScheduledWorkout: (workoutId: string) => void;
+  rescheduleWorkout: (workoutId: string, newDate: string, newTime: string) => void;
   startWorkoutSession: (session: WorkoutSession) => void;
   updateWorkoutSession: (session: WorkoutSession) => void;
   completeWorkoutSession: (session: WorkoutSession) => void;
@@ -22,6 +24,8 @@ type AppAction =
   | { type: 'ADD_WORKOUT'; payload: WorkoutData }
   | { type: 'CREATE_WORKOUT_TEMPLATE'; payload: WorkoutTemplate }
   | { type: 'SCHEDULE_WORKOUT'; payload: ScheduledWorkout }
+  | { type: 'CANCEL_SCHEDULED_WORKOUT'; payload: string }
+  | { type: 'RESCHEDULE_WORKOUT'; payload: { workoutId: string; newDate: string; newTime: string } }
   | { type: 'START_WORKOUT_SESSION'; payload: WorkoutSession }
   | { type: 'UPDATE_WORKOUT_SESSION'; payload: WorkoutSession }
   | { type: 'COMPLETE_WORKOUT_SESSION'; payload: WorkoutSession }
@@ -109,6 +113,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, workoutTemplates: [...state.workoutTemplates, action.payload] };
     case 'SCHEDULE_WORKOUT':
       return { ...state, scheduledWorkouts: [...state.scheduledWorkouts, action.payload] };
+    case 'CANCEL_SCHEDULED_WORKOUT':
+      return { 
+        ...state, 
+        scheduledWorkouts: state.scheduledWorkouts.filter(sw => sw.id !== action.payload) 
+      };
+    case 'RESCHEDULE_WORKOUT':
+      return {
+        ...state,
+        scheduledWorkouts: state.scheduledWorkouts.map(sw =>
+          sw.id === action.payload.workoutId
+            ? { ...sw, scheduledDate: action.payload.newDate, scheduledTime: action.payload.newTime }
+            : sw
+        )
+      };
     case 'START_WORKOUT_SESSION':
       return { ...state, currentWorkoutSession: action.payload };
     case 'UPDATE_WORKOUT_SESSION':
@@ -155,6 +173,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SCHEDULE_WORKOUT', payload: scheduledWorkout });
   };
 
+  const cancelScheduledWorkout = (workoutId: string) => {
+    dispatch({ type: 'CANCEL_SCHEDULED_WORKOUT', payload: workoutId });
+  };
+
+  const rescheduleWorkout = (workoutId: string, newDate: string, newTime: string) => {
+    dispatch({ type: 'RESCHEDULE_WORKOUT', payload: { workoutId, newDate, newTime } });
+  };
+
   const startWorkoutSession = (session: WorkoutSession) => {
     dispatch({ type: 'START_WORKOUT_SESSION', payload: session });
   };
@@ -179,6 +205,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addWorkout,
       createWorkoutTemplate,
       scheduleWorkout,
+      cancelScheduledWorkout,
+      rescheduleWorkout,
       startWorkoutSession,
       updateWorkoutSession,
       completeWorkoutSession,

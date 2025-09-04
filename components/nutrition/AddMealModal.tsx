@@ -131,7 +131,7 @@ export default function AddMealModal({ visible, onClose, onSave }: AddMealModalP
         )}
 
         {step === 2 && (
-          <ScrollView style={styles.content}>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: "10%" }}>
             <Text style={styles.stepTitle}>Add Food Items</Text>
             
             <View style={styles.form}>

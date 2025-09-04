@@ -15,9 +15,10 @@ export default function WorkoutScreen() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showWorkoutSession, setShowWorkoutSession] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
+  const [editingWorkout, setEditingWorkout] = useState<any>(null);
 
   try {
-    const { state, startWorkoutSession } = useAppContext();
+    const { state, startWorkoutSession, cancelScheduledWorkout } = useAppContext();
 
     // Get today's scheduled workouts
     const todaysWorkouts = state.scheduledWorkouts.filter(
@@ -39,6 +40,31 @@ export default function WorkoutScreen() {
       };
       setSelectedWorkout(session);
       setShowWorkoutSession(true);
+    };
+
+    const handleCancelWorkout = (scheduledWorkout: any) => {
+      Alert.alert(
+        'Cancel Workout',
+        `Are you sure you want to cancel "${scheduledWorkout.template.name}"?`,
+        [
+          {
+            text: 'No',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes, Cancel',
+            style: 'destructive',
+            onPress: () => {
+              cancelScheduledWorkout(scheduledWorkout.id);
+            },
+          },
+        ]
+      );
+    };
+
+    const handleRescheduleWorkout = (scheduledWorkout: any) => {
+      setEditingWorkout(scheduledWorkout);
+      setShowScheduleModal(true);
     };
 
     const tabs = [
@@ -93,8 +119,8 @@ export default function WorkoutScreen() {
                     key={scheduledWorkout.id}
                     scheduledWorkout={scheduledWorkout}
                     onStart={() => handleStartWorkout(scheduledWorkout)}
-                    onReschedule={() => setShowScheduleModal(true)}
-                    onCancel={() => Alert.alert('Cancel', 'Cancel this workout?')}
+                    onReschedule={() => handleRescheduleWorkout(scheduledWorkout)}
+                    onCancel={() => handleCancelWorkout(scheduledWorkout)}
                   />
                 ))
               ) : (
@@ -102,7 +128,10 @@ export default function WorkoutScreen() {
                   <Text style={styles.cardText}>No workout scheduled for today</Text>
                   <TouchableOpacity 
                     style={styles.button}
-                    onPress={() => setShowScheduleModal(true)}
+                    onPress={() => {
+                      setEditingWorkout(null);
+                      setShowScheduleModal(true);
+                    }}
                   >
                     <Text style={styles.buttonText}>Schedule Workout</Text>
                   </TouchableOpacity>
@@ -118,14 +147,17 @@ export default function WorkoutScreen() {
                     key={scheduledWorkout.id}
                     scheduledWorkout={scheduledWorkout}
                     onStart={() => handleStartWorkout(scheduledWorkout)}
-                    onReschedule={() => setShowScheduleModal(true)}
-                    onCancel={() => Alert.alert('Cancel', 'Cancel this workout?')}
+                    onReschedule={() => handleRescheduleWorkout(scheduledWorkout)}
+                    onCancel={() => handleCancelWorkout(scheduledWorkout)}
                   />
                 ))}
               
               <TouchableOpacity 
                 style={styles.scheduleButton}
-                onPress={() => setShowScheduleModal(true)}
+                onPress={() => {
+                  setEditingWorkout(null);
+                  setShowScheduleModal(true);
+                }}
               >
                 <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
                 <Text style={styles.scheduleButtonText}>Schedule New Workout</Text>
@@ -203,15 +235,30 @@ export default function WorkoutScreen() {
         {showScheduleModal && (
           <ScheduleWorkoutModal
             visible={showScheduleModal}
-            onClose={() => setShowScheduleModal(false)}
+            onClose={() => {
+              setShowScheduleModal(false);
+              setEditingWorkout(null);
+            }}
+            editingWorkout={editingWorkout}
           />
         )}
 
         {showWorkoutSession && selectedWorkout && (
           <WorkoutSession
-            visible={showWorkoutSession}
-            workout={selectedWorkout}
-            onClose={() => {
+            template={{
+              id: selectedWorkout.templateId,
+              name: selectedWorkout.templateName,
+              exercises: selectedWorkout.exercises,
+              estimatedDuration: 0,
+              estimatedCalories: 0,
+              category: 'mixed',
+              createdAt: new Date().toISOString()
+            }}
+            onComplete={(session) => {
+              setShowWorkoutSession(false);
+              setSelectedWorkout(null);
+            }}
+            onCancel={() => {
               setShowWorkoutSession(false);
               setSelectedWorkout(null);
             }}

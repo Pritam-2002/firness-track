@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,13 +8,69 @@ import { useAppContext } from '../../context/AppContext';
 interface ScheduleWorkoutModalProps {
   visible: boolean;
   onClose: () => void;
+  editingWorkout?: ScheduledWorkout | null;
 }
 
-export default function ScheduleWorkoutModal({ visible, onClose }: ScheduleWorkoutModalProps) {
-  const { state, scheduleWorkout } = useAppContext();
-  const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedTime, setSelectedTime] = useState('18:00');
+export default function ScheduleWorkoutModal({ visible, onClose, editingWorkout }: ScheduleWorkoutModalProps) {
+  const { state, scheduleWorkout, rescheduleWorkout } = useAppContext();
+  const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(
+    editingWorkout ? editingWorkout.template : null
+  );
+  const [selectedDate, setSelectedDate] = useState(
+    editingWorkout ? editingWorkout.scheduledDate : new Date().toISOString().split('T')[0]
+  );
+  const [selectedTime, setSelectedTime] = useState(
+    editingWorkout ? editingWorkout.scheduledTime : '18:00'
+  );
+
+  const timeSlots = [
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00', '21:00'
+  ];
+
+  // Check if a time slot is disabled (for today's date)
+  const isTimeSlotDisabled = (timeSlot: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    if (selectedDate !== today) return false;
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTime = currentHour + (currentMinute / 60);
+    
+    const [slotHour, slotMinute] = timeSlot.split(':').map(Number);
+    const slotTime = slotHour + (slotMinute / 60);
+    
+    return slotTime <= currentTime;
+  };
+
+  // Auto-select the next available time when today is selected and current time is past
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (selectedDate === today && selectedTime) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTime = currentHour + (currentMinute / 60);
+      
+      const [selectedHour, selectedMinute] = selectedTime.split(':').map(Number);
+      const selectedTimeValue = selectedHour + (selectedMinute / 60);
+      
+      // If selected time is in the past, find the next available time
+      if (selectedTimeValue <= currentTime) {
+        const nextAvailableTime = timeSlots.find(timeSlot => {
+          const [slotHour, slotMinute] = timeSlot.split(':').map(Number);
+          const slotTime = slotHour + (slotMinute / 60);
+          return slotTime > currentTime;
+        });
+        
+        if (nextAvailableTime) {
+          setSelectedTime(nextAvailableTime);
+        }
+      }
+    }
+  }, [selectedDate, selectedTime]);
 
   const handleSchedule = () => {
     if (!selectedTemplate) {
@@ -22,18 +78,29 @@ export default function ScheduleWorkoutModal({ visible, onClose }: ScheduleWorko
       return;
     }
 
-    const scheduledWorkout: ScheduledWorkout = {
-      id: Date.now().toString(),
-      templateId: selectedTemplate.id,
-      template: selectedTemplate,
-      scheduledDate: selectedDate,
-      scheduledTime: selectedTime,
-      status: 'scheduled',
-    };
+    if (!selectedTime) {
+      Alert.alert('Error', 'Please select a time');
+      return;
+    }
 
-    scheduleWorkout(scheduledWorkout);
+    if (editingWorkout) {
+      // Update existing workout
+      rescheduleWorkout(editingWorkout.id, selectedDate, selectedTime);
+    } else {
+      // Create new workout
+      const scheduledWorkout: ScheduledWorkout = {
+        id: Date.now().toString(),
+        templateId: selectedTemplate.id,
+        template: selectedTemplate,
+        scheduledDate: selectedDate,
+        scheduledTime: selectedTime,
+        status: 'scheduled',
+      };
+      scheduleWorkout(scheduledWorkout);
+    }
+
     onClose();
-    setSelectedTemplate(null);
+    setSelectedTemplate(editingWorkout ? editingWorkout.template : null);
   };
 
   const getNextDays = (count: number) => {
@@ -53,13 +120,9 @@ export default function ScheduleWorkoutModal({ visible, onClose }: ScheduleWorko
     return days;
   };
 
-  const timeSlots = [
-    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
-    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-    '18:00', '19:00', '20:00', '21:00'
-  ];
-
   const nextDays = getNextDays(7);
+
+  // Check if a time slot is disabled (for today's date)
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -68,9 +131,13 @@ export default function ScheduleWorkoutModal({ visible, onClose }: ScheduleWorko
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color={Colors.gray[600]} />
           </TouchableOpacity>
-          <Text style={styles.title}>Schedule Workout</Text>
+          <Text style={styles.title}>
+            {editingWorkout ? 'Reschedule Workout' : 'Schedule Workout'}
+          </Text>
           <TouchableOpacity onPress={handleSchedule} style={styles.scheduleButton}>
-            <Text style={styles.scheduleText}>Schedule</Text>
+            <Text style={styles.scheduleText}>
+              {editingWorkout ? 'Update' : 'Schedule'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -116,7 +183,7 @@ export default function ScheduleWorkoutModal({ visible, onClose }: ScheduleWorko
           {/* Select Date */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Select Date</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: Spacing.lg }} style={styles.dateScroll}>
               {nextDays.map((day) => (
                 <TouchableOpacity
                   key={day.date}
@@ -147,23 +214,33 @@ export default function ScheduleWorkoutModal({ visible, onClose }: ScheduleWorko
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Select Time</Text>
             <View style={styles.timeGrid}>
-              {timeSlots.map((time) => (
-                <TouchableOpacity
-                  key={time}
-                  style={[
-                    styles.timeSlot,
-                    selectedTime === time && styles.selectedTime
-                  ]}
-                  onPress={() => setSelectedTime(time)}
-                >
-                  <Text style={[
-                    styles.timeText,
-                    selectedTime === time && styles.selectedTimeText
-                  ]}>
-                    {time}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {timeSlots.map((time) => {
+                const isDisabled = isTimeSlotDisabled(time);
+                return (
+                  <TouchableOpacity
+                    key={time}
+                    style={[
+                      styles.timeSlot,
+                      selectedTime === time && styles.selectedTime,
+                      isDisabled && styles.disabledTimeSlot
+                    ]}
+                    onPress={() => {
+                      if (!isDisabled) {
+                        setSelectedTime(time);
+                      }
+                    }}
+                    disabled={isDisabled}
+                  >
+                    <Text style={[
+                      styles.timeText,
+                      selectedTime === time && styles.selectedTimeText,
+                      isDisabled && styles.disabledTimeText
+                    ]}>
+                      {time}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </ScrollView>
@@ -281,7 +358,8 @@ const styles = StyleSheet.create({
   },
   dateScroll: {
     marginHorizontal: -Spacing.lg,
-    paddingHorizontal: Spacing.lg,
+    
+   
   },
   dateCard: {
     backgroundColor: Colors.white,
@@ -337,5 +415,13 @@ const styles = StyleSheet.create({
   },
   selectedTimeText: {
     color: Colors.white,
+  },
+  disabledTimeSlot: {
+    backgroundColor: Colors.gray[100],
+    borderColor: Colors.gray[200],
+    opacity: 0.5,
+  },
+  disabledTimeText: {
+    color: Colors.gray[400],
   },
 });
