@@ -1,17 +1,32 @@
 // Global type definitions for RunCoach AI
 
+export type UserRole = 'client' | 'admin';
+
 export interface UserProfile {
+  id: string;
   name: string;
   age: number;
   height: number; // in cm
   weight: number; // in kg
   fitnessLevel: 'beginner' | 'intermediate' | 'advanced';
   weeklyAvailability: number; // hours per week
+  role: UserRole;
   syncPreferences: {
     garmin: boolean;
     appleWatch: boolean;
     strava: boolean;
   };
+}
+
+// User interface for admin management
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  profile: UserProfile;
+  createdAt: string;
+  lastActive: string;
 }
 
 export interface FitnessGoals {

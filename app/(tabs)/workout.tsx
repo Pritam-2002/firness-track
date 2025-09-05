@@ -7,6 +7,8 @@ import CreateWorkoutModal from '../../components/workout/CreateWorkoutModal';
 import ScheduleWorkoutModal from '../../components/workout/ScheduleWorkoutModal';
 import ScheduledWorkoutCard from '../../components/workout/ScheduledWorkoutCard';
 import WorkoutSession from '../../components/workout/WorkoutSession';
+import AdminUserManagement from '../../components/nutrition/AdminUserManagement';
+import { UserRole, User } from '../../types';
 type WorkoutTab = 'today' | 'builder' | 'history';
 
 export default function WorkoutScreen() {
@@ -16,9 +18,100 @@ export default function WorkoutScreen() {
   const [showWorkoutSession, setShowWorkoutSession] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [editingWorkout, setEditingWorkout] = useState<any>(null);
+  
+  // Admin state
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   try {
     const { state, startWorkoutSession, cancelScheduledWorkout } = useAppContext();
+
+    // Get user role from context, default to 'client' if not set
+    // const userRole: UserRole = state.userProfile?.role || 'client';
+    const userRole: UserRole = 'admin'; // Change from 'client' to 'admin'
+    
+    // Mock users data for admin functionality
+    const mockUsers: User[] = [
+      {
+        id: '1',
+        name: 'John Doe',
+        email: 'john@example.com',
+        role: 'client',
+        profile: {
+          id: '1',
+          name: 'John Doe',
+          age: 28,
+          height: 175,
+          weight: 70,
+          fitnessLevel: 'intermediate',
+          weeklyAvailability: 5,
+          role: 'client',
+          syncPreferences: {
+            garmin: true,
+            appleWatch: false,
+            strava: true
+          }
+        },
+        createdAt: '2024-01-15T10:00:00Z',
+        lastActive: '2024-01-20T15:30:00Z'
+      },
+      {
+        id: '2',
+        name: 'Jane Smith',
+        email: 'jane@example.com',
+        role: 'client',
+        profile: {
+          id: '2',
+          name: 'Jane Smith',
+          age: 32,
+          height: 165,
+          weight: 60,
+          fitnessLevel: 'advanced',
+          weeklyAvailability: 7,
+          role: 'client',
+          syncPreferences: {
+            garmin: false,
+            appleWatch: true,
+            strava: false
+          }
+        },
+        createdAt: '2024-01-10T09:00:00Z',
+        lastActive: '2024-01-20T12:15:00Z'
+      },
+      {
+        id: '3',
+        name: 'Mike Johnson',
+        email: 'mike@example.com',
+        role: 'client',
+        profile: {
+          id: '3',
+          name: 'Mike Johnson',
+          age: 25,
+          height: 180,
+          weight: 75,
+          fitnessLevel: 'beginner',
+          weeklyAvailability: 3,
+          role: 'client',
+          syncPreferences: {
+            garmin: true,
+            appleWatch: true,
+            strava: true
+          }
+        },
+        createdAt: '2024-01-18T14:00:00Z',
+        lastActive: '2024-01-19T18:45:00Z'
+      }
+    ];
+    
+    const users = userRole === 'admin' ? mockUsers : [];
+
+    // Admin handlers
+    const handleUserSelect = (userId: string) => {
+      setSelectedUserId(userId);
+    };
+
+    const handleUserDeselect = () => {
+      setSelectedUserId(null);
+    };
 
     // Get today's scheduled workouts
     const todaysWorkouts = state.scheduledWorkouts.filter(
@@ -108,7 +201,17 @@ export default function WorkoutScreen() {
           ))}
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: "10%" }}>
+          {/* Admin User Management Section */}
+          {userRole === 'admin' && (
+            <AdminUserManagement
+              users={users}
+              selectedUserId={selectedUserId}
+              onUserSelect={handleUserSelect}
+              onUserDeselect={handleUserDeselect}
+            />
+          )}
+
           {activeTab === 'today' && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Today's Workouts</Text>
@@ -334,7 +437,12 @@ const styles = StyleSheet.create({
     color: Colors.gray[600] 
   },
   activeTabText: { color: Colors.white },
-  content: { flex: 1, paddingHorizontal: Spacing.lg },
+  content: {
+    flex: 1,
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: 150, // Increased bottom padding to prevent overlap with tab bar
+  },
   section: { paddingBottom: Spacing.xl },
   sectionTitle: { 
     fontSize: Typography.fontSize.lg, 
