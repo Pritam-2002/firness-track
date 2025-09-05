@@ -8,6 +8,9 @@ import MealCard from '../../components/nutrition/MealCard';
 import HydrationTracker from '../../components/nutrition/HydrationTracker';
 import AddMealModal from '../../components/nutrition/AddMealModal';
 import AddWaterModal from '../../components/nutrition/AddWaterModal';
+import AdminUserManagement from '../../components/nutrition/AdminUserManagement';
+import { UserRole, User } from '../../types';
+import { useAppContext } from '../../context/AppContext';
 
 interface FoodItem {
   id: string;
@@ -27,6 +30,88 @@ interface Meal {
 }
 
 export default function NutritionScreen() {
+  const { state, updateUserProfile } = useAppContext();
+  
+  // Get user role from context, default to 'client' if not set
+  // const userRole: UserRole = state.userProfile?.role || 'client';
+  const userRole: UserRole = 'admin'; // Change 'client' to 'admin'
+
+  
+  
+  // Mock users data for admin functionality
+  const mockUsers: User[] = [
+    {
+      id: '1',
+      name: 'John Doe',
+      email: 'john@example.com',
+      role: 'client',
+      profile: {
+        id: '1',
+        name: 'John Doe',
+        age: 28,
+        height: 175,
+        weight: 70,
+        fitnessLevel: 'intermediate',
+        weeklyAvailability: 5,
+        role: 'client',
+        syncPreferences: {
+          garmin: true,
+          appleWatch: false,
+          strava: true
+        }
+      },
+      createdAt: '2024-01-15T10:00:00Z',
+      lastActive: '2024-01-20T15:30:00Z'
+    },
+    {
+      id: '2',
+      name: 'Jane Smith',
+      email: 'jane@example.com',
+      role: 'client',
+      profile: {
+        id: '2',
+        name: 'Jane Smith',
+        age: 32,
+        height: 165,
+        weight: 60,
+        fitnessLevel: 'advanced',
+        weeklyAvailability: 7,
+        role: 'client',
+        syncPreferences: {
+          garmin: false,
+          appleWatch: true,
+          strava: false
+        }
+      },
+      createdAt: '2024-01-10T09:00:00Z',
+      lastActive: '2024-01-20T12:15:00Z'
+    },
+    {
+      id: '3',
+      name: 'Mike Johnson',
+      email: 'mike@example.com',
+      role: 'client',
+      profile: {
+        id: '3',
+        name: 'Mike Johnson',
+        age: 25,
+        height: 180,
+        weight: 75,
+        fitnessLevel: 'beginner',
+        weeklyAvailability: 3,
+        role: 'client',
+        syncPreferences: {
+          garmin: true,
+          appleWatch: true,
+          strava: true
+        }
+      },
+      createdAt: '2024-01-18T14:00:00Z',
+      lastActive: '2024-01-19T18:45:00Z'
+    }
+  ];
+  
+  const users = userRole === 'admin' ? mockUsers : [];
   const [meals, setMeals] = useState<Meal[]>([
     {
       id: '1',
@@ -43,6 +128,9 @@ export default function NutritionScreen() {
   const [showMealModal, setShowMealModal] = useState(false);
   const [showWaterModal, setShowWaterModal] = useState(false);
   const [showFloatingMenu, setShowFloatingMenu] = useState(false);
+  
+  // Admin state
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   // Calculate totals
   const totals = meals.reduce((acc, meal) => {
@@ -88,6 +176,15 @@ export default function NutritionScreen() {
     handleAddWater(amount);
   };
 
+  // Admin handlers
+  const handleUserSelect = (userId: string) => {
+    setSelectedUserId(userId);
+  };
+
+  const handleUserDeselect = () => {
+    setSelectedUserId(null);
+  };
+
   // Group meals by category
   const mealsByCategory = meals.reduce((acc, meal) => {
     if (!acc[meal.category]) acc[meal.category] = [];
@@ -100,6 +197,16 @@ export default function NutritionScreen() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: "10%" }}>
+        {/* Admin User Management Section */}
+        {userRole === 'admin' && (
+          <AdminUserManagement
+            users={users}
+            selectedUserId={selectedUserId}
+            onUserSelect={handleUserSelect}
+            onUserDeselect={handleUserDeselect}
+          />
+        )}
+
         {/* Calorie Summary */}
         <CalorieSummaryCard
           consumed={totals.calories}
